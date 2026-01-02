@@ -12,6 +12,31 @@ let score = 0;
 let lives = 3;
 let gameSpeed = 2;
 let frameCount = 0;
+let selectedSpeed = 'normal';
+
+// 速度配置
+const SPEED_CONFIG = {
+    slow: {
+        initialSpeed: 1.5,
+        increment: 0.3,
+        enemyFrequency: 120
+    },
+    normal: {
+        initialSpeed: 2,
+        increment: 0.5,
+        enemyFrequency: 90
+    },
+    fast: {
+        initialSpeed: 3,
+        increment: 0.7,
+        enemyFrequency: 70
+    },
+    super: {
+        initialSpeed: 4.5,
+        increment: 1,
+        enemyFrequency: 50
+    }
+};
 
 // 卡通顏色配置
 const COLORS = {
@@ -147,8 +172,9 @@ function updateEnemies() {
         }
     });
 
-    // 隨機生成新敵車
-    if (frameCount % 90 === 0) {
+    // 隨機生成新敵車（根據選擇的速度調整頻率）
+    const frequency = SPEED_CONFIG[selectedSpeed].enemyFrequency;
+    if (frameCount % frequency === 0) {
         createEnemy();
     }
 }
@@ -184,9 +210,9 @@ function checkCollision() {
 function updateScore() {
     document.getElementById('score').textContent = score;
 
-    // 增加難度
+    // 增加難度（根據選擇的速度調整增量）
     if (score > 0 && score % 100 === 0) {
-        gameSpeed += 0.5;
+        gameSpeed += SPEED_CONFIG[selectedSpeed].increment;
     }
 }
 
@@ -226,7 +252,7 @@ function startGame() {
     gameRunning = true;
     score = 0;
     lives = 3;
-    gameSpeed = 2;
+    gameSpeed = SPEED_CONFIG[selectedSpeed].initialSpeed;
     frameCount = 0;
     enemies = [];
 
@@ -297,6 +323,21 @@ canvas.addEventListener('click', (e) => {
 document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('restartBtn').addEventListener('click', startGame);
 document.getElementById('playAgainBtn').addEventListener('click', startGame);
+
+// 速度選擇事件
+const speedButtons = document.querySelectorAll('.speed-btn');
+speedButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        // 移除所有按鈕的 active 類
+        speedButtons.forEach(btn => btn.classList.remove('active'));
+
+        // 添加 active 類到被點擊的按鈕
+        button.classList.add('active');
+
+        // 更新選擇的速度
+        selectedSpeed = button.getAttribute('data-speed');
+    });
+});
 
 // 初始繪製
 drawBackground();

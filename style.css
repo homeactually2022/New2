@@ -92,6 +92,56 @@ h1 {
     font-size: 1.1em;
 }
 
+.speed-selector {
+    margin: 20px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, #FFE66D 0%, #FFA07A 100%);
+    border-radius: 15px;
+}
+
+.speed-selector h3 {
+    color: #2C3E50;
+    margin-bottom: 15px;
+    font-size: 1.3em;
+}
+
+.speed-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.speed-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 15px;
+    font-size: 1.1em;
+    background: white;
+    border: 3px solid transparent;
+    border-radius: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.speed-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.speed-btn.active {
+    background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);
+    border-color: #2C3E50;
+    color: white;
+    font-weight: bold;
+}
+
+.speed-emoji {
+    font-size: 2em;
+}
+
 button {
     font-size: 1.3em;
     padding: 15px 40px;
