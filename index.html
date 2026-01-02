@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏎️ 兒童卡通賽車遊戲</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1>🏎️ 卡通賽車遊戲 🏎️</h1>
+            <div class="score-board">
+                <div class="score">分數: <span id="score">0</span></div>
+                <div class="lives">❤️ <span id="lives">3</span></div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="controls">
+            <div class="instructions">
+                <p>🎮 用方向鍵 ← → 控制賽車</p>
+                <p>📱 手機可以點擊左右兩邊</p>
+            </div>
+            <button id="startBtn" class="btn-start">開始遊戲</button>
+            <button id="restartBtn" class="btn-restart" style="display: none;">重新開始</button>
+        </div>
+
+        <div id="gameOver" class="game-over" style="display: none;">
+            <h2>遊戲結束！</h2>
+            <p>最終分數: <span id="finalScore">0</span></p>
+            <button id="playAgainBtn" class="btn-play-again">再玩一次</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

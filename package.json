@@ -1,0 +1,19 @@
+{
+  "name": "cartoon-racing-game",
+  "version": "1.0.0",
+  "description": "兒童卡通賽車遊戲 - A colorful cartoon racing game for children",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server -p 3000"
+  },
+  "keywords": [
+    "game",
+    "racing",
+    "cartoon",
+    "children",
+    "html5",
+    "canvas"
+  ],
+  "author": "",
+  "license": "MIT"
+}
