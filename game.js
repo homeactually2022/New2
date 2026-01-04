@@ -48,144 +48,296 @@ const COLORS = {
     sky: '#87CEEB'
 };
 
+// Pseudo-3D Perspective Configuration
+const PERSPECTIVE = {
+    horizonY: 150,              // Vanishing point height
+    roadWidthAtBottom: 300,     // Road width at bottom
+    roadWidthAtHorizon: 80,     // Road width at horizon
+    minScale: 0.15,             // Smallest car size (at horizon)
+    maxScale: 1.0,              // Largest car size (at bottom)
+    lanesAtBottom: 3,           // Number of lanes
+    segmentHeight: 30,          // Road segment height
+    numSegments: 20             // Total road segments
+};
+
+// Calculate scale factor based on Y position (0=horizon, 600=bottom)
+function getScaleAtY(y) {
+    const normalizedY = Math.max(0, Math.min(1, (y - PERSPECTIVE.horizonY) / (canvas.height - PERSPECTIVE.horizonY)));
+    return PERSPECTIVE.minScale + (PERSPECTIVE.maxScale - PERSPECTIVE.minScale) * normalizedY;
+}
+
+// Calculate road width at given Y position
+function getRoadWidthAtY(y) {
+    const normalizedY = Math.max(0, Math.min(1, (y - PERSPECTIVE.horizonY) / (canvas.height - PERSPECTIVE.horizonY)));
+    return PERSPECTIVE.roadWidthAtHorizon + (PERSPECTIVE.roadWidthAtBottom - PERSPECTIVE.roadWidthAtHorizon) * normalizedY;
+}
+
+// Calculate lane center X position based on lane index and Y position
+function getLaneXAtY(laneIndex, y) {
+    const roadWidth = getRoadWidthAtY(y);
+    const roadLeft = (canvas.width - roadWidth) / 2;
+    const laneWidth = roadWidth / PERSPECTIVE.lanesAtBottom;
+    return roadLeft + (laneIndex + 0.5) * laneWidth;
+}
+
+// Convert world Z position to screen Y coordinate
+function worldZToScreenY(z, maxZ = 1000) {
+    const normalizedZ = z / maxZ;
+    return PERSPECTIVE.horizonY + normalizedZ * (canvas.height - PERSPECTIVE.horizonY);
+}
+
+// Get actual car dimensions based on scale
+function getCarDimensions(baseWidth, baseHeight, scale) {
+    return {
+        width: baseWidth * scale,
+        height: baseHeight * scale
+    };
+}
+
 // 玩家賽車
 const player = {
-    x: canvas.width / 2 - 25,
-    y: canvas.height - 120,
-    width: 50,
-    height: 80,
+    lane: 1,        // Lane index (0, 1, 2)
+    z: 950,         // Z-depth (higher = closer to camera)
+    width: 50,      // Base width
+    height: 80,     // Base height
     color: COLORS.player[0],
     speed: 5
 };
 
+// Compute screen position from lane and Z
+function getPlayerScreenPos() {
+    const y = worldZToScreenY(player.z, 1000);
+    const x = getLaneXAtY(player.lane, y);
+    const scale = getScaleAtY(y);
+    return { x, y, scale };
+}
+
 // 敵方賽車陣列
 let enemies = [];
 
-// 道路標線
-let roadLines = [];
+// 繪製卡通賽車 (Enhanced with perspective scaling)
+function drawCar(x, y, width, height, color, scale = 1.0) {
+    const scaledWidth = width * scale;
+    const scaledHeight = height * scale;
 
-// 初始化道路標線
-function initRoadLines() {
-    roadLines = [];
-    for (let i = 0; i < 8; i++) {
-        roadLines.push({
-            x: canvas.width / 2 - 5,
-            y: i * 100 - 50,
-            width: 10,
-            height: 50
-        });
-    }
-}
+    // Center the car on the X coordinate
+    const drawX = x - scaledWidth / 2;
+    const drawY = y - scaledHeight;
 
-// 繪製卡通賽車
-function drawCar(x, y, width, height, color) {
+    // Save context state
+    ctx.save();
+
     // 車身
     ctx.fillStyle = color;
-    ctx.fillRect(x + 5, y + 20, width - 10, height - 30);
+    ctx.fillRect(
+        drawX + 5 * scale,
+        drawY + 20 * scale,
+        scaledWidth - 10 * scale,
+        scaledHeight - 30 * scale
+    );
 
     // 車頂（圓角）
     ctx.beginPath();
-    ctx.arc(x + width / 2, y + 25, width / 3, Math.PI, 0);
+    ctx.arc(
+        drawX + scaledWidth / 2,
+        drawY + 25 * scale,
+        (scaledWidth / 3),
+        Math.PI,
+        0
+    );
     ctx.fill();
 
-    // 車窗
-    ctx.fillStyle = '#87CEEB';
-    ctx.fillRect(x + 12, y + 22, width - 24, 25);
+    // 車窗 (only draw if car is large enough)
+    if (scale > 0.3) {
+        ctx.fillStyle = '#87CEEB';
+        ctx.fillRect(
+            drawX + 12 * scale,
+            drawY + 22 * scale,
+            scaledWidth - 24 * scale,
+            25 * scale
+        );
+    }
 
     // 輪胎
     ctx.fillStyle = '#2C3E50';
-    ctx.fillRect(x, y + 25, 8, 20);
-    ctx.fillRect(x + width - 8, y + 25, 8, 20);
-    ctx.fillRect(x, y + height - 30, 8, 20);
-    ctx.fillRect(x + width - 8, y + height - 30, 8, 20);
+    const wheelWidth = 8 * scale;
+    const wheelHeight = 20 * scale;
 
-    // 車輪高光
-    ctx.fillStyle = '#7F8C8D';
-    ctx.fillRect(x + 2, y + 27, 3, 16);
-    ctx.fillRect(x + width - 5, y + 27, 3, 16);
-    ctx.fillRect(x + 2, y + height - 28, 3, 16);
-    ctx.fillRect(x + width - 5, y + height - 28, 3, 16);
+    // Front wheels
+    ctx.fillRect(drawX, drawY + 25 * scale, wheelWidth, wheelHeight);
+    ctx.fillRect(drawX + scaledWidth - wheelWidth, drawY + 25 * scale, wheelWidth, wheelHeight);
 
-    // 車燈
-    ctx.fillStyle = '#FFE66D';
-    ctx.fillRect(x + 10, y + height - 15, 12, 8);
-    ctx.fillRect(x + width - 22, y + height - 15, 12, 8);
+    // Back wheels
+    ctx.fillRect(drawX, drawY + scaledHeight - 30 * scale, wheelWidth, wheelHeight);
+    ctx.fillRect(drawX + scaledWidth - wheelWidth, drawY + scaledHeight - 30 * scale, wheelWidth, wheelHeight);
+
+    // 車輪高光 (only if scale > 0.4)
+    if (scale > 0.4) {
+        ctx.fillStyle = '#7F8C8D';
+        const highlightWidth = 3 * scale;
+        const highlightHeight = 16 * scale;
+
+        ctx.fillRect(drawX + 2 * scale, drawY + 27 * scale, highlightWidth, highlightHeight);
+        ctx.fillRect(drawX + scaledWidth - 5 * scale, drawY + 27 * scale, highlightWidth, highlightHeight);
+        ctx.fillRect(drawX + 2 * scale, drawY + scaledHeight - 28 * scale, highlightWidth, highlightHeight);
+        ctx.fillRect(drawX + scaledWidth - 5 * scale, drawY + scaledHeight - 28 * scale, highlightWidth, highlightHeight);
+    }
+
+    // 車燈 (only if scale > 0.3)
+    if (scale > 0.3) {
+        ctx.fillStyle = '#FFE66D';
+        ctx.fillRect(drawX + 10 * scale, drawY + scaledHeight - 15 * scale, 12 * scale, 8 * scale);
+        ctx.fillRect(drawX + scaledWidth - 22 * scale, drawY + scaledHeight - 15 * scale, 12 * scale, 8 * scale);
+    }
+
+    ctx.restore();
 }
 
-// 繪製背景
+// 繪製背景 (Pseudo-3D perspective)
 function drawBackground() {
-    // 天空
-    ctx.fillStyle = COLORS.sky;
+    // Sky with gradient
+    const skyGradient = ctx.createLinearGradient(0, 0, 0, PERSPECTIVE.horizonY);
+    skyGradient.addColorStop(0, '#87CEEB');
+    skyGradient.addColorStop(1, '#B0E0E6');
+    ctx.fillStyle = skyGradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 草地（左右兩側）
-    ctx.fillStyle = COLORS.grass;
-    ctx.fillRect(0, 0, 50, canvas.height);
-    ctx.fillRect(canvas.width - 50, 0, 50, canvas.height);
+    // Draw road segments from horizon to bottom
+    for (let i = 0; i < PERSPECTIVE.numSegments; i++) {
+        const segmentIndex = i;
+        const y1 = PERSPECTIVE.horizonY + (i * (canvas.height - PERSPECTIVE.horizonY) / PERSPECTIVE.numSegments);
+        const y2 = PERSPECTIVE.horizonY + ((i + 1) * (canvas.height - PERSPECTIVE.horizonY) / PERSPECTIVE.numSegments);
 
-    // 道路
-    ctx.fillStyle = COLORS.road;
-    ctx.fillRect(50, 0, canvas.width - 100, canvas.height);
+        const roadWidth1 = getRoadWidthAtY(y1);
+        const roadWidth2 = getRoadWidthAtY(y2);
 
-    // 道路標線（虛線）
-    ctx.fillStyle = COLORS.roadLine;
-    roadLines.forEach(line => {
-        ctx.fillRect(line.x, line.y, line.width, line.height);
-    });
-}
+        const roadLeft1 = (canvas.width - roadWidth1) / 2;
+        const roadLeft2 = (canvas.width - roadWidth2) / 2;
 
-// 更新道路標線
-function updateRoadLines() {
-    roadLines.forEach(line => {
-        line.y += gameSpeed;
-        if (line.y > canvas.height) {
-            line.y = -50;
+        // Alternating road colors for depth effect
+        const roadColor = (segmentIndex + Math.floor(frameCount / 10)) % 2 === 0
+            ? COLORS.road
+            : '#34495E';
+
+        // Draw grass (left and right)
+        ctx.fillStyle = COLORS.grass;
+
+        // Left grass
+        ctx.beginPath();
+        ctx.moveTo(0, y1);
+        ctx.lineTo(roadLeft1, y1);
+        ctx.lineTo(roadLeft2, y2);
+        ctx.lineTo(0, y2);
+        ctx.fill();
+
+        // Right grass
+        ctx.beginPath();
+        ctx.moveTo(canvas.width, y1);
+        ctx.lineTo(roadLeft1 + roadWidth1, y1);
+        ctx.lineTo(roadLeft2 + roadWidth2, y2);
+        ctx.lineTo(canvas.width, y2);
+        ctx.fill();
+
+        // Draw road segment
+        ctx.fillStyle = roadColor;
+        ctx.beginPath();
+        ctx.moveTo(roadLeft1, y1);
+        ctx.lineTo(roadLeft1 + roadWidth1, y1);
+        ctx.lineTo(roadLeft2 + roadWidth2, y2);
+        ctx.lineTo(roadLeft2, y2);
+        ctx.fill();
+
+        // Draw lane dividers (dashed lines)
+        if ((segmentIndex + Math.floor(frameCount / 5)) % 3 === 0) {
+            ctx.strokeStyle = COLORS.roadLine;
+            ctx.lineWidth = 2 + (y2 - PERSPECTIVE.horizonY) / 100;
+
+            // Draw lane dividing lines
+            for (let lane = 1; lane < PERSPECTIVE.lanesAtBottom; lane++) {
+                const laneRatio = lane / PERSPECTIVE.lanesAtBottom;
+                const x1 = roadLeft1 + roadWidth1 * laneRatio;
+                const x2 = roadLeft2 + roadWidth2 * laneRatio;
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
         }
-    });
+    }
 }
 
 // 創建敵方賽車
 function createEnemy() {
-    const lanes = [80, 165, 250]; // 三個車道
-    const lane = lanes[Math.floor(Math.random() * lanes.length)];
+    const lane = Math.floor(Math.random() * PERSPECTIVE.lanesAtBottom);
     const color = COLORS.enemies[Math.floor(Math.random() * COLORS.enemies.length)];
 
     enemies.push({
-        x: lane,
-        y: -100,
-        width: 50,
-        height: 80,
-        color: color
+        lane: lane,
+        z: 0,           // Start far away (at horizon)
+        width: 50,      // Base width
+        height: 80,     // Base height
+        color: color,
+        speed: gameSpeed
     });
 }
 
 // 更新敵方賽車
 function updateEnemies() {
     enemies.forEach((enemy, index) => {
-        enemy.y += gameSpeed;
+        // Move enemy toward camera (increase Z)
+        enemy.z += enemy.speed * 10;
 
-        // 移除超出畫面的敵車
-        if (enemy.y > canvas.height) {
+        // Remove enemies that pass the player
+        if (enemy.z > 1000) {
             enemies.splice(index, 1);
             score += 10;
             updateScore();
         }
     });
 
-    // 隨機生成新敵車（根據選擇的速度調整頻率）
+    // Generate new enemies based on speed configuration
     const frequency = SPEED_CONFIG[selectedSpeed].enemyFrequency;
     if (frameCount % frequency === 0) {
         createEnemy();
     }
 }
 
-// 檢測碰撞
+// 檢測碰撞 (Z-depth aware)
 function checkCollision() {
+    const playerPos = getPlayerScreenPos();
+    const playerBounds = getCarDimensions(player.width, player.height, playerPos.scale);
+
+    // Collision only checks cars at similar Z-depth
+    const Z_COLLISION_THRESHOLD = 50;
+
     for (let enemy of enemies) {
-        if (player.x < enemy.x + enemy.width &&
-            player.x + player.width > enemy.x &&
-            player.y < enemy.y + enemy.height &&
-            player.y + player.height > enemy.y) {
+        // Check if enemy is at similar depth
+        if (Math.abs(enemy.z - player.z) > Z_COLLISION_THRESHOLD) {
+            continue;
+        }
+
+        const enemyY = worldZToScreenY(enemy.z, 1000);
+        const enemyX = getLaneXAtY(enemy.lane, enemyY);
+        const enemyScale = getScaleAtY(enemyY);
+        const enemyBounds = getCarDimensions(enemy.width, enemy.height, enemyScale);
+
+        // Simple rectangular collision with scaled dimensions
+        const playerLeft = playerPos.x - playerBounds.width / 2;
+        const playerRight = playerPos.x + playerBounds.width / 2;
+        const playerTop = playerPos.y - playerBounds.height;
+        const playerBottom = playerPos.y;
+
+        const enemyLeft = enemyX - enemyBounds.width / 2;
+        const enemyRight = enemyX + enemyBounds.width / 2;
+        const enemyTop = enemyY - enemyBounds.height;
+        const enemyBottom = enemyY;
+
+        // Check overlap
+        if (playerLeft < enemyRight &&
+            playerRight > enemyLeft &&
+            playerTop < enemyBottom &&
+            playerBottom > enemyTop) {
 
             // 碰撞發生
             lives--;
@@ -229,18 +381,51 @@ function gameLoop() {
 
     // 繪製背景和道路
     drawBackground();
-    updateRoadLines();
 
-    // 繪製玩家賽車
-    drawCar(player.x, player.y, player.width, player.height, player.color);
+    // Collect all cars (enemies + player) with their Z-depth for sorting
+    const allCars = [];
 
-    // 更新和繪製敵方賽車
-    updateEnemies();
+    // Add enemies
     enemies.forEach(enemy => {
-        drawCar(enemy.x, enemy.y, enemy.width, enemy.height, enemy.color);
+        const y = worldZToScreenY(enemy.z, 1000);
+        const x = getLaneXAtY(enemy.lane, y);
+        const scale = getScaleAtY(y);
+
+        allCars.push({
+            z: enemy.z,
+            x: x,
+            y: y,
+            width: enemy.width,
+            height: enemy.height,
+            color: enemy.color,
+            scale: scale,
+            isPlayer: false
+        });
     });
 
-    // 檢測碰撞
+    // Add player
+    const playerPos = getPlayerScreenPos();
+    allCars.push({
+        z: player.z,
+        x: playerPos.x,
+        y: playerPos.y,
+        width: player.width,
+        height: player.height,
+        color: player.color,
+        scale: playerPos.scale,
+        isPlayer: true
+    });
+
+    // Sort by Z-depth (far to near) for proper rendering order
+    allCars.sort((a, b) => a.z - b.z);
+
+    // Draw all cars in sorted order
+    allCars.forEach(car => {
+        drawCar(car.x, car.y, car.width, car.height, car.color, car.scale);
+    });
+
+    // Update game state
+    updateEnemies();
     checkCollision();
 
     frameCount++;
@@ -256,10 +441,11 @@ function startGame() {
     frameCount = 0;
     enemies = [];
 
-    player.x = canvas.width / 2 - 25;
+    // Reset player to center lane
+    player.lane = 1;
+    player.z = 950;
     player.color = COLORS.player[Math.floor(Math.random() * COLORS.player.length)];
 
-    initRoadLines();
     updateScore();
     updateLives();
 
@@ -277,15 +463,15 @@ function endGame() {
     document.getElementById('gameOver').style.display = 'flex';
 }
 
-// 鍵盤控制
+// 鍵盤控制 (Lane switching)
 document.addEventListener('keydown', (e) => {
     if (!gameRunning) return;
 
-    if (e.key === 'ArrowLeft' && player.x > 60) {
-        player.x -= player.speed * 3;
+    if (e.key === 'ArrowLeft' && player.lane > 0) {
+        player.lane--;
     }
-    if (e.key === 'ArrowRight' && player.x < canvas.width - 110) {
-        player.x += player.speed * 3;
+    if (e.key === 'ArrowRight' && player.lane < PERSPECTIVE.lanesAtBottom - 1) {
+        player.lane++;
     }
 });
 
@@ -298,10 +484,10 @@ canvas.addEventListener('touchstart', (e) => {
     const rect = canvas.getBoundingClientRect();
     const touchX = touch.clientX - rect.left;
 
-    if (touchX < canvas.width / 2 && player.x > 60) {
-        player.x -= player.speed * 4;
-    } else if (touchX >= canvas.width / 2 && player.x < canvas.width - 110) {
-        player.x += player.speed * 4;
+    if (touchX < canvas.width / 2 && player.lane > 0) {
+        player.lane--;
+    } else if (touchX >= canvas.width / 2 && player.lane < PERSPECTIVE.lanesAtBottom - 1) {
+        player.lane++;
     }
 });
 
@@ -312,10 +498,10 @@ canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
 
-    if (clickX < canvas.width / 2 && player.x > 60) {
-        player.x -= player.speed * 4;
-    } else if (clickX >= canvas.width / 2 && player.x < canvas.width - 110) {
-        player.x += player.speed * 4;
+    if (clickX < canvas.width / 2 && player.lane > 0) {
+        player.lane--;
+    } else if (clickX >= canvas.width / 2 && player.lane < PERSPECTIVE.lanesAtBottom - 1) {
+        player.lane++;
     }
 });
 
@@ -341,5 +527,5 @@ speedButtons.forEach(button => {
 
 // 初始繪製
 drawBackground();
-initRoadLines();
-drawCar(player.x, player.y, player.width, player.height, player.color);
+const playerPos = getPlayerScreenPos();
+drawCar(playerPos.x, playerPos.y, player.width, player.height, player.color, playerPos.scale);
